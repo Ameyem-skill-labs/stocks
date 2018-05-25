@@ -1,0 +1,22 @@
+/NSE
+/BSE
+/public
+/extranse
+/stock_pickle
+/stock_pickle_old
+/ml_stk_pickle
+/DATA
+/MT5IndicatorsPy
+/pandas_talib
+/ta-lib
+/Stock Analysis/img
+/vendor
+/node_modules
+/storage/*.key
+/public/uploads
+/.idea
+/.vagran
+*.xls
+*.xlsx
+*.pkl
+.env

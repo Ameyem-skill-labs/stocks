@@ -1,0 +1,166 @@
+
+
+    # In[41]:
+    def get_dir(self):
+        return os.listdir(self.data_folder)
+    def save_pkl(file,var):
+        with open(file, 'wb') as f:
+            pickle.dump(var, f)
+            f.close()
+    def load_pkl(file):
+        with open(file, 'rb') as f: 
+            var = pickle.load(f)
+            f.close()
+        return var
+
+    def stock_array(table_name):
+        empty_array=[]
+        return empty_array
+
+    def put_entry(table_arrays,symbols, valarray):
+        i=0
+        default=[]
+        for val in valarray:
+            table_arrays.setdefault(symbols[i],default)
+            table_arrays[symbols[i]].append(val)
+            i +=1
+        return table_arrays
+    def armarray_table_fns(symbols):
+        return    dict((s,stock_array(s)) for s in symbols)
+    def update_tables(table_arrays,symbols):
+        table_arrays.update(armarray_table_fns(symbols))
+        return table_arrays
+
+    def csvdf_process(myZip):
+        df=pd.read_csv(myZip)
+        if 'Unnamed: 13' in df.columns:
+            df=df.drop(['Unnamed: 13'], axis=1)
+        tstamp=datetime.strptime(df['TIMESTAMP'].iloc[0],'%d-%b-%Y')
+        symbols=df.SYMBOL.values
+        df['TIMESTAMP']=tstamp
+        df=df[df.columns[2:-1]].drop('PREVCLOSE',1)
+        if len(df.columns)==8:
+            df['TOTALTRADES']=0
+        values=df.values
+
+        return symbols,values
+
+
+    # In[46]:
+
+    def get_tablearray(self,files_not_in_pickle):
+        # here table_fns are table arrays
+        k=0 #one if tests for k value be careful
+        started=datetime.now()
+        old=datetime.now()
+        table_fns={}
+        print("Reading from zip -> csv from {} files".format(len(files_not_in_pickle)))
+        for file in files_not_in_pickle:
+            zip_ref = ZipFile(self.data_folder+file, 'r')
+            try:   
+                with zip_ref as my_zip_file:
+                    with my_zip_file.open(my_zip_file.namelist()[0]) as myZip:
+                        symbols,values=self.csvdf_process(myZip)
+                        tables=np.asarray(list(table_fns.keys())).astype(object)        
+                        tbls_not_in_db=np.setdiff1d(symbols,tables)            
+                        if(k==0):
+                            table_fns= self.update_tables(table_fns,symbols)
+
+                        if(len(tables)>0 and len(tbls_not_in_db)>0):
+                            table_fns= self.update_tables(table_fns,tbls_not_in_db)
+                        table_fns=self.put_entry(table_fns, symbols, values)
+                        k+=1
+                        print(k,end=', ')
+                        if (k%100==0):            
+                            print("{} of {} files written to DB..".format(k,len(dirlist)))
+                            nowtime=datetime.now()
+                            print("last 100files took ..")
+                            print(nowtime-old)
+                            print("From first it took ..",end='')
+                            print(nowtime-started)
+                            old=nowtime
+
+            except:
+                print("Zip file not good for file: {}".format(file))
+        print("Reading from zip -> csv Completed ..")
+        return tables, table_fns
+
+
+    # In[48]:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        #ldirlist=self.get_dir(self)
+        print("hello")
+        
+        #DL=pd.DataFrame(ldirlist)
+        #print(ldirlist)
+        print(DL)
+        # tstamp=pd.Series;
+        tstam=[]
+        i=0
+        for fname in self.dirlist:
+            tstam.append(datetime.strptime(fname[2:11],'%d%b%Y'))
+
+        DL['tstamp']=tstam  
+        print(DL)
+        DL=DL.sort_values(by=['tstamp'])
+        ldirlist=DL[0].tolist()
+        try:
+            columns=self.load_pkl(self.pickle_path+'columns_ref.pkl')
+            dirlist_written=self.load_pkl(self.pickle_path+'wrtitten_files.pkl')
+            symbols_pkl=self.load_pkl(self.pickle_path+'symbols.pkl')
+        except:
+            columns=[]
+            dirlist_written=[]
+            symbols_pkl=[]
+        stime=datetime.now()
+        files_not_in_pickle=np.setdiff1d(ldirlist,dirlist_written)
+        tables, table_arrays=get_tablearray(files_not_in_pickle)
+        tbls_not_in_pkl=np.setdiff1d(tables,symbols_pkl) 
+        tbls_in_pkl=np.intersect1d(tables,symbols_pkl) 
+        tbls_all=np.union1d(tables,symbols_pkl) 
+        # tbls_in_pkl
+        # len(tbls_all),len(tbls_not_in_pkl),len(tbls_in_pkl)
+        columns=['OPEN','HIGH','LOW','CLOSE','LAST','TOTTRDQTY','TOTTRDVAL','TIMESTAMP','TOTALTRADES']
+        stime=datetime.now()
+        self.save_pkl(self.pickle_path+'columns_ref.pkl',columns)
+        self.save_pkl(self.pickle_path+'wrtitten_files.pkl',ldirlist)
+        self.save_pkl(self.pickle_path+'symbols.pkl',tbls_all)
+        i=0
+        for tbl in tbls_in_pkl:
+            # Saving the objects:
+            stock_array=self.load_pkl(pickle_path+tbl+'.pkl')
+            stock_array.extend(table_arrays.get(tbl))    
+            self.save_pkl(self.pickle_path+tbl+'.pkl',stock_array)
+            i +=1
+            if i%100 ==0:
+                print('{} files among {} re-written'.format(i,len(tbls_in_pkl)))
+        i=0    
+        for tbl in tbls_not_in_pkl:
+            self.save_pkl(self.pickle_path+tbl+'.pkl',table_arrays.get(tbl))
+            i +=1
+            if i%2 ==0:
+                print('{} files among {} written'.format(i,len(tbls_not_in_pkl)))
+        print("For all It took {} time".format(datetime.now()-stime))
+
+
